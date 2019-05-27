@@ -37,20 +37,16 @@ class QTableAgent(Agent):
         self.gamma = 0.95
         self.learning_rate = 0.8
         self.num_actions = env.action_space.n
-        obs_space = env.observation_space.spaces
-        my_paddle_space = obs_space[player].n
-        board_width = obs_space[2].n
-        board_height = obs_space[3].n
-        self.q = np.zeros([my_paddle_space, board_width, board_height, self.num_actions])
+        obs_space = env.observation_space
+        board_height = obs_space.shape[0]
+        board_width = obs_space.shape[1]
+        self.q = np.zeros([board_height, board_width, self.num_actions])
         self.epsilon = 0.1
         self.last_state = None
         self.last_action = None
 
     def forward(self, state) -> int:
-        paddle_position = state[self.player] - 1
-        ball_x = state[2] - 1
-        ball_y = state[3] - 1
-        q = self.q[paddle_position, ball_x, ball_y]
+        # q = self.q[paddle_position, ball_x, ball_y]
         if np.random.uniform() < self.epsilon:
             action = np.random.randint(0, self.num_actions - 1)
         else:
@@ -76,8 +72,7 @@ class QTableAgent(Agent):
 
 def play_game():
     env = gym.make('PycroRTS-v3')
-    agent_cls = QTableAgent
-    agents = [agent_cls(i, env) for i in range(2)]
+    agents = [QTableAgent(i, env) for i in range(2)]
     results = {
         'winners': [],
         'steps': []
@@ -90,21 +85,23 @@ def play_game():
         step = 0
 
         while not is_game_over:
-            actions = []
-            for agent in agents:
-                action = agent.forward(obs)
-                actions.append(action)
-
-            obs, rewards, is_game_over, _ = env.step(actions)
-
+            # for agent in agents:
             for player, agent in enumerate(agents):
-                reward = rewards[player]
+                action = agent.forward(obs)
+                obs, reward, is_game_over, _ = env.step(action)
                 agent.backwards(reward, is_game_over, obs)
                 env.render()
-                if reward == 1:
+                if is_game_over:
+                    # run final step
+                    agent = agents[(player + 1) % len(agents)]
+                    # action = agent.forward(obs)
+                    obs, reward, is_game_over, _ = env.step(action)
+                    agent.backwards(reward, is_game_over, obs)
+
                     results['winners'].append(player)
                     results['steps'].append(step)
                     # print('episode:', episode, 'winner:', player, 'steps', step)
+                    break
             step += 1
         # print()
     steps = np.array(results['steps'])

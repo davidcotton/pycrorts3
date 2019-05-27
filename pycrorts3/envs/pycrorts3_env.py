@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import gym
 from gym import spaces
 import numpy as np
@@ -19,22 +21,32 @@ class PycroRts3Env(gym.Env):
         self.observation_space = spaces.Box(
             low=0,
             high=255,
-            shape=(BOARD_HEIGHT, BOARD_WIDTH, 3),
+            shape=(BOARD_HEIGHT, BOARD_WIDTH),
             dtype=np.uint8
         )
-        # self.time = 0
-        # self.game_over = False
-        # self.winner = None
-        self.game = Game()
+        self.time = 0
+        self.game_over = False
+        self.winner = None
+        # self.game = Game()
+        self.map = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.uint8)
 
-    def reset(self):
-        # self.time = 0
-        # self.game_over = False
-        # self.winner = None
-        self.game.reset()
+    def reset(self) -> np.ndarray:
+        self.time = 0
+        self.game_over = False
+        self.winner = None
 
-    def step(self, action):
-        return self.game.step(action)
+        # state = self.game.reset()
+        state = self.map[:]
 
-    def render(self, mode='human'):
-        return self.game.render()
+        return state
+
+    def step(self, action) -> Tuple[np.ndarray, float, bool, dict]:
+        # return self.game.step(action)
+        next_state = self.map[:]
+        reward = 0.0
+
+        return next_state, reward, self.game_over, {}
+
+    def render(self, mode='human') -> None:
+        print('foo')
+        # self.game.render()
