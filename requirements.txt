@@ -1,2 +1,2 @@
-numpy
-gym==0.10.3
+gym>=0.10.3
+ray[rllib, debug]

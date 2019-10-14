@@ -1,1 +1,1 @@
-from pycrorts3.envs.pycrorts3_env import PycroRts3Env
+from pycrorts3.envs.pycrorts3_env import PycroRts3Env, PycroRts3MultiAgentEnv
