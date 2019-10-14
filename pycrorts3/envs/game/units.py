@@ -3,16 +3,6 @@ from enum import Enum
 from pycrorts3.envs.game.position import Position
 
 
-# class MicroRTSUnitType(Enum):
-#     Resource = 0
-#     Base = 1
-#     Barracks = 2
-#     Worker = 3
-#     Light = 4
-#     Heavy = 5
-#     Ranged = 6
-
-
 class Unit:
     # actions = [
     #     'NOOP',
@@ -67,6 +57,14 @@ class Unit:
         # self.attack_time = int(attack_time)
         # self.sight_radius = int(sight_radius)
 
+    @property
+    def x(self):
+        return self.position.x
+
+    @property
+    def y(self):
+        return self.position.y
+
 
 class WorkerUnit(Unit):
     pass
@@ -100,8 +98,6 @@ class BarracksBuilding(Unit):
     pass
 
 
-# class UnitTypeTable:
-#     pass
 unit_type_table = {
     'original': {
         'base': {
@@ -129,35 +125,4 @@ unit_classes = {
 }
 
 
-# class UnitFactory:
-#     @staticmethod
-#     def build(unit_type: str, unit_id: int, player_id: int, position: Position, hitpoints: int, resources: int) -> Unit:
-#         if unit_type == 'Resource':
-#             cls = ResourceUnit
-#             ut = utt.get_type('Resource')
-#         elif unit_type == 'Base':
-#             cls = BaseUnit
-#             ut = utt.get_type('Base')
-#         elif unit_type == 'Barracks':
-#             cls = BarracksUnit
-#             ut = utt.get_type('Barracks')
-#         elif unit_type == 'Worker':
-#             cls = WorkerUnit
-#             ut = utt.get_type('Worker')
-#         elif unit_type == 'Light':
-#             cls = LightUnit
-#             ut = utt.get_type('Light')
-#         elif unit_type == 'Heavy':
-#             cls = HeavyUnit
-#             ut = utt.get_type('Heavy')
-#         elif unit_type == 'Ranged':
-#             cls = RangedUnit
-#             ut = utt.get_type('Ranged')
-#         else:
-#             raise ValueError
-#
-#         unit = cls(unit_id, player_id, position, hitpoints, resources, ut.cost, ut.min_damage, ut.max_damage,
-#                    ut.attack_range, ut.move_time, ut.harvest_time, ut.return_time, ut.produce_time, ut.attack_time,
-#                    ut.sight_radius)
-#
-#         return unit
+UnitEncoding = Enum('UnitEncoding', 'BaseBuilding BarracksBuilding WorkerUnit LightUnit HeavyUnit RangedUnit')

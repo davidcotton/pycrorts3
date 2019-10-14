@@ -1,12 +1,11 @@
 import os
-from typing import Dict
 
 import numpy as np
 import untangle
 
 from pycrorts3.envs.game.player import Player
 from pycrorts3.envs.game.position import Position
-from pycrorts3.envs.game.units import Unit, unit_classes
+from pycrorts3.envs.game.units import Unit, unit_classes, UnitEncoding
 
 
 class Map:
@@ -31,12 +30,21 @@ class Map:
                 i += 1
 
         # units
-        self.units: Dict[Position, Unit] = {}
+        self.units = {}
+        self.unit_map = np.zeros((self.height, self.width), dtype=np.uint8)
         for unit in map_data.rts_PhysicalGameState.units.rts_units_Unit:
+            unit_id = int(unit['ID'])
+            unit_cls = unit_classes[unit['type']]
             pos = Position(int(unit['x']), int(unit['y']))
-            unit = unit_classes[unit['type']](unit['ID'], unit['player'], pos)
-            self.units[pos] = unit
-        foo = 1
+            self.units[unit_id] = unit_cls(unit_id, unit['player'], pos)
+            self.unit_map[pos.y, pos.x] = UnitEncoding[unit_cls.__name__].value
+
+    def get_state(self, unit_id) -> np.ndarray:
+        assert unit_id in self.units
+        state = self.terrain.copy() + self.unit_map.copy()
+        unit = self.units[unit_id]
+        state[unit.y, unit.x] += len(UnitEncoding)
+        return state
 
     def _read_map_file(self, map_filename):
         return untangle.parse(os.path.join('pycrorts3', 'envs', 'game', 'maps', map_filename))

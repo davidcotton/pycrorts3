@@ -56,8 +56,8 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
     def __init__(self, env_config=None) -> None:
         super().__init__()
         self.game = Game(env_config)
-        map_height = self.game.map_height
-        map_width = self.game.map_width
+        map_height = self.game.map.height
+        map_width = self.game.map.width
 
         self.action_space = spaces.Discrete(NUM_ACTIONS)
         self.observation_space = spaces.Dict({
@@ -72,7 +72,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
             #     'positions': spaces.MultiDiscrete([1,1]),
             # }),
             'player_id': spaces.Box(low=0, high=1, shape=(1,), dtype=np.uint8),
-            # 'resources': spaces.Box(low=0, high=65535, shape=(2,), dtype=np.uint16),
+            # 'resources': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(2,), dtype=np.uint16),
         })
 
     def reset(self):
@@ -81,7 +81,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for unit in self.game.map.units.values():
             obs = {
                 'action_mask': np.ones((NUM_ACTIONS,), dtype=np.uint8),
-                'terrain': np.zeros((self.game.map.height, self.game.map.width), dtype=np.uint8),
+                'terrain': self.game.map.get_state(unit.id),
                 'player_id': np.array([unit.player_id]),
                 # 'resources': [],
             }
@@ -98,7 +98,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for unit in self.game.map.units.values():
             obs_dict[unit.id] = {
                 'action_mask': np.ones((NUM_ACTIONS,), dtype=np.uint8),
-                'terrain': np.zeros((self.game.map.height, self.game.map.width), dtype=np.uint8),
+                'terrain': self.game.map.get_state(unit.id),
                 'player_id': np.array([unit.player_id]),
                 # 'resources': self._get_resources(),
             }

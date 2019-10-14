@@ -41,39 +41,18 @@ class Game:
         self.is_game_over = False
         self.winner = None
 
-    def step(self, actions):
+    def step(self, action):
         assert not self.is_game_over
-        assert len(actions) == 2
-
-        for player, action in enumerate(actions):
-            pass
-
-        self.update()
-
-        state = np.array([])
-        rewards = (0.0, 0.0)
-
-        self.time += 1
-
-        return state, rewards, self.is_game_over, {}
 
     def update(self) -> None:
         pass
 
-    def render(self):
-        return np.array([])
+    def get_state(self, unit_id):
+        return self.map.get_state(unit_id)
 
     @property
     def map_filename(self) -> str:
         return self.env_config['map_filename']
-
-    @property
-    def map_height(self) -> int:
-        return self.map.height
-
-    @property
-    def map_width(self) -> int:
-        return self.map.width
 
     @property
     def max_steps_per_game(self) -> int:
