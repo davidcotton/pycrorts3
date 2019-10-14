@@ -79,7 +79,6 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         self.game.reset()
         obs_dict = {}
         for unit in self.game.map.units.values():
-            # if unit.player_id == 0:
             obs = {
                 'action_mask': np.ones((NUM_ACTIONS,), dtype=np.uint8),
                 'terrain': np.zeros((self.game.map.height, self.game.map.width), dtype=np.uint8),
@@ -90,18 +89,25 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         return obs_dict
 
     def step(self, action_dict):
+        for unit_id, action in action_dict.items():
+            self.game.step(action)
+
+        self.game.update()
+
         obs_dict = {}
-        rewards = {}
-        for player, actions in action_dict.items():
-            new_obs, reward, game_over, _ = self.game.step(actions)
-            obs_dict[player] = {
-                'action_mask': self.get_action_mask(player),
-                # 'terrain': self.game.terrain,
-                # 'units': self._get_units(player),
-                'board': self._get_board(player),
-                'player_id': np.array([player]),
-                'resources': self._get_resources(),
+        for unit in self.game.map.units.values():
+            obs_dict[unit.id] = {
+                'action_mask': np.ones((NUM_ACTIONS,), dtype=np.uint8),
+                'terrain': np.zeros((self.game.map.height, self.game.map.width), dtype=np.uint8),
+                'player_id': np.array([unit.player_id]),
+                # 'resources': self._get_resources(),
             }
-            rewards[player] = reward
+
+        rewards = {}
+        if self.game.is_game_over:
+            rewards[self.game.winner] = self.game.reward_win
+            rewards[1 - self.game.winner] = self.game.reward_lose
+
         game_over = {'__all__': self.game.is_game_over}
+
         return obs_dict, rewards, game_over, {}
