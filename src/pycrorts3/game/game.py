@@ -1,12 +1,4 @@
-from typing import Dict, Tuple
-
-import numpy as np
-
-from pycrorts3.envs.game.map import Map
-from pycrorts3.envs.game.player import Player
-from pycrorts3.envs.game.position import Position
-from pycrorts3.envs.game.units import Unit
-
+from .map import Map
 
 MAP_FILENAME = '4x4_melee_light2.xml'
 MAX_STEPS_PER_GAME = 1500
@@ -43,6 +35,7 @@ class Game:
 
     def step(self, action):
         assert not self.is_game_over
+        foo = 1
 
     def update(self) -> None:
         pass

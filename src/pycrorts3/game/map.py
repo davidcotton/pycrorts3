@@ -1,11 +1,12 @@
 import os
 
 import numpy as np
+import pkg_resources
 import untangle
 
-from pycrorts3.envs.game.player import Player
-from pycrorts3.envs.game.position import Position
-from pycrorts3.envs.game.units import Unit, unit_classes, UnitEncoding
+from .player import Player
+from .position import Position
+from .units import unit_classes, UnitEncoding
 
 
 class Map:
@@ -47,4 +48,5 @@ class Map:
         return state
 
     def _read_map_file(self, map_filename):
-        return untangle.parse(os.path.join('pycrorts3', 'envs', 'game', 'maps', map_filename))
+        map_data = pkg_resources.resource_string(__name__, os.path.join('maps', map_filename)).decode('utf-8')
+        return untangle.parse(map_data)

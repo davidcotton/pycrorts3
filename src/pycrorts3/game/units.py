@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pycrorts3.envs.game.position import Position
+from .position import Position
 
 
 class Unit:

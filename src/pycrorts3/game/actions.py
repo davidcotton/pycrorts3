@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pycrorts3.envs.game.units import Unit
+from .units import Unit
 
 
 class Actions(Enum):
