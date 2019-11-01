@@ -4,8 +4,8 @@ import gym
 from gym import spaces
 import numpy as np
 
-from src.pycrorts3.game import Game
-from src.pycrorts3.game import Actions
+from ..game import Game
+from ..game import Actions
 
 
 class PycroRts3Env(gym.Env):

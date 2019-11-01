@@ -2,7 +2,7 @@ from gym import spaces
 import numpy as np
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
-from src.pycrorts3.game import Game
+from ..game import Game
 
 NUM_ACTIONS = 9
 
