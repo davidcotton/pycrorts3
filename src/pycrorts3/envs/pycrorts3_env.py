@@ -5,7 +5,7 @@ from gym import spaces
 import numpy as np
 
 from ..game import Game
-from ..game import Actions
+from ..game import ActionTypes
 
 
 class PycroRts3Env(gym.Env):
@@ -16,7 +16,7 @@ class PycroRts3Env(gym.Env):
         self.game = Game(env_config)
         map_height = self.game.map.height
         map_width = self.game.map.width
-        self.action_space = spaces.Discrete(len(Actions))
+        self.action_space = spaces.Discrete(len(ActionTypes))
         self.observation_space = spaces.Box(low=0, high=255, shape=(map_height, map_width), dtype=np.uint8)
         self.time = 0
         self.game_over = False

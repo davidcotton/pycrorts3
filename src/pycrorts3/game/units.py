@@ -4,6 +4,18 @@ from .position import Position
 
 
 class Unit:
+    cost = 0
+    hitpoints = 0
+    min_damage = 0
+    max_damage = 0
+    attack_range = 0
+    produce_time = 0
+    move_time = 0
+    attack_time = 0
+    harvest_time = 0
+    return_time = 0
+    sight_radius = 0
+
     # actions = [
     #     'NOOP',
     #     'MOVE_UP',
@@ -15,13 +27,13 @@ class Unit:
     #     'ATTACK_DOWN',
     #     'ATTACK_LEFT',
     # ]
-    actions = [
-        'NOOP',
-        'MOVE',
-        'ATTACK',
-        'HARVEST',
-        'PRODUCE',
-    ]
+    # actions = [
+    #     'NOOP',
+    #     'MOVE',
+    #     'ATTACK',
+    #     'HARVEST',
+    #     'PRODUCE',
+    # ]
 
     def __init__(self,
                  unit_id: int,
@@ -56,6 +68,7 @@ class Unit:
         # self.produce_time = int(produce_time)
         # self.attack_time = int(attack_time)
         # self.sight_radius = int(sight_radius)
+        self.in_progress = False
 
     @property
     def x(self):
@@ -65,9 +78,28 @@ class Unit:
     def y(self):
         return self.position.y
 
+    def deal_damage(self, deterministic=True):
+        if deterministic:
+            return self.max_damage
+        else:
+            return self.max_damage  # to do later
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}<{self.position.x},{self.position.y}>'
+
 
 class WorkerUnit(Unit):
-    pass
+    cost = 1
+    hitpoints = 1
+    min_damage = 1
+    max_damage = 1
+    attack_range = 1
+    produce_time = 50
+    move_time = 10
+    attack_time = 5
+    harvest_time = 20
+    return_time = 10
+    sight_radius = 3
 
 
 class LightUnit(Unit):
@@ -83,19 +115,51 @@ class LightUnit(Unit):
 
 
 class HeavyUnit(Unit):
-    pass
+    cost = 3
+    hitpoints = 8
+    min_damage = 4
+    max_damage = 4
+    attack_range = 1
+    produce_time = 120
+    move_time = 10
+    attack_time = 5
+    sight_radius = 2
 
 
 class RangedUnit(Unit):
-    pass
+    cost = 2
+    hitpoints = 1
+    min_damage = 1
+    max_damage = 1
+    attack_range = 3
+    produce_time = 100
+    move_time = 10
+    attack_time = 5
+    sight_radius = 3
 
 
 class BaseBuilding(Unit):
-    pass
+    cost = 10
+    hitpoints = 10
+    min_damage = 0
+    max_damage = 0
+    attack_range = 0
+    produce_time = 200
+    move_time = 0
+    attack_time = 0
+    sight_radius = 5
 
 
 class BarracksBuilding(Unit):
-    pass
+    cost = 5
+    hitpoints = 4
+    min_damage = 0
+    max_damage = 0
+    attack_range = 0
+    produce_time = 200
+    move_time = 0
+    attack_time = 0
+    sight_radius = 3
 
 
 unit_type_table = {

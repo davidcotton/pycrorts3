@@ -1,4 +1,5 @@
-from .actions import Actions, Action, NoopAction, MoveAction, AttackAction, HarvestAction, ProduceAction
+from .actions import ActionTypes, ActionEncodings, Action, NoopAction, MoveAction, AttackAction, HarvestAction, \
+    ProduceAction
 from .game import Game
 from .map import Map
 from .player import Player

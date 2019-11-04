@@ -2,7 +2,7 @@ import logging
 
 from gym.envs.registration import register
 
-from .envs.multi_agent_env import PycroRts3MultiAgentEnv
+from .envs import PycroRts3MultiAgentEnv, HierarchicalPycroRts3MultiAgentEnv
 
 
 logger = logging.getLogger(__name__)
