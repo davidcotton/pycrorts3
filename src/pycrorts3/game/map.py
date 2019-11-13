@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import pkg_resources
@@ -33,7 +33,7 @@ class Map:
                 i += 1
 
         # units
-        self.units = {}
+        self.units: Dict[int, Unit] = {}
         self.unit_map = np.zeros((self.height, self.width), dtype=np.uint8)
         for unit in map_data.rts_PhysicalGameState.units.rts_units_Unit:
             unit_id = int(unit['ID'])
@@ -46,11 +46,15 @@ class Map:
         return self.units[unit_id]
 
     def move_unit(self, unit_id, new_position):
-        assert unit_id in self.units
+        if unit_id not in self.units:
+            raise ValueError
+        # assert unit_id in self.units
         unit = self.units[unit_id]
         old_x, old_y = unit.position
         new_x, new_y = new_position
-        assert self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0
+        if not(self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0):
+            raise ValueError
+        # assert self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0
         self.unit_map[new_y, new_x], self.unit_map[old_y, old_x] = self.unit_map[old_y, old_x], 0
         unit.position = new_position
 
@@ -79,8 +83,10 @@ class Map:
 
         :param unit_id: The ID of the unit to remove.
         """
-        unit = self.units.pop(unit_id)
+        # unit = self.units.pop(unit_id)
+        unit = self.units[unit_id]
         self.unit_map[unit.y, unit.x] = 0
+        unit.position = Position(-1, -1)  # move them off the board so other units can occupy their former location
 
     def is_legal_action(self, action: Action) -> bool:
         """Check an action is consistent with game rules/state?
@@ -132,7 +138,11 @@ class Map:
         if unit_id is not None:
             assert unit_id in self.units
             unit = self.units[unit_id]
-            state[unit.y, unit.x] += len(UnitEncoding)
+            if not unit.is_dead():
+                state[unit.y, unit.x] += len(UnitEncoding)
+            for other in self.units.values():
+                if other.player_id == unit.player_id:
+                    state[other.y, other.x] += len(UnitEncoding)
         return state
 
     def _read_map_file(self, map_filename: str):

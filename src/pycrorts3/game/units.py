@@ -16,25 +16,6 @@ class Unit:
     return_time = 0
     sight_radius = 0
 
-    # actions = [
-    #     'NOOP',
-    #     'MOVE_UP',
-    #     'MOVE_RIGHT',
-    #     'MOVE_DOWN',
-    #     'MOVE_LEFT',
-    #     'ATTACK_UP',
-    #     'ATTACK_RIGHT',
-    #     'ATTACK_DOWN',
-    #     'ATTACK_LEFT',
-    # ]
-    # actions = [
-    #     'NOOP',
-    #     'MOVE',
-    #     'ATTACK',
-    #     'HARVEST',
-    #     'PRODUCE',
-    # ]
-
     def __init__(self,
                  unit_id: int,
                  player_id: int,
@@ -71,18 +52,21 @@ class Unit:
         self.in_progress = False
 
     @property
-    def x(self):
+    def x(self) -> int:
         return self.position.x
 
     @property
-    def y(self):
+    def y(self) -> int:
         return self.position.y
 
-    def deal_damage(self, deterministic=True):
+    def deal_damage(self, deterministic=True) -> int:
         if deterministic:
             return self.max_damage
         else:
-            return self.max_damage  # to do later
+            return self.max_damage  # todo
+
+    def is_dead(self) -> bool:
+        return self.hitpoints <= 0
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}<{self.position.x},{self.position.y}>'

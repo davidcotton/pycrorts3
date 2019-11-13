@@ -31,7 +31,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
             # }),
             'player_id': spaces.Box(low=0, high=1, shape=(1,), dtype=np.uint8),
             'resources': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(1,), dtype=np.uint16),
-            'time': spaces.Box(low=0, high=np.iinfo('uint8').max, shape=(1,), dtype=np.uint8),
+            'time': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(1,), dtype=np.uint16),
         })
 
     def reset(self):
@@ -40,7 +40,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for unit_id, unit in self.game.map.units.items():
             player_id = unit.player_id
             obs = {
-                'action_mask': self.game.map.get_action_mask(unit),
+                'action_mask': self.game.get_action_mask(unit),
                 'board': np.ravel(self.game.get_state(unit_id)),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.map.players[player_id].minerals]),
@@ -81,7 +81,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for unit_id, unit in self.game.map.units.items():
             player_id = unit.player_id
             obs = {
-                'action_mask': self.game.map.get_action_mask(unit),
+                'action_mask': self.game.get_action_mask(unit),
                 'board': np.ravel(self.game.get_state(unit_id)),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.map.players[player_id].minerals]),
