@@ -49,7 +49,7 @@ class Unit:
         # self.produce_time = int(produce_time)
         # self.attack_time = int(attack_time)
         # self.sight_radius = int(sight_radius)
-        self.in_progress = False
+        self.has_pending_action = False
 
     @property
     def x(self) -> int:

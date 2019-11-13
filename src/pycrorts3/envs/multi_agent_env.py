@@ -53,7 +53,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         # convert action indexes into game action objects and queue them
         for unit_id, action_id in action_dict.items():
             unit = self.game.map.get_unit(unit_id)
-            if unit.in_progress:
+            if unit.has_pending_action:
                 continue
             action_type = ActionEncodings(action_id).name
             start_time = self.game.time
