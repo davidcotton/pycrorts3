@@ -11,7 +11,13 @@ from .units import Unit
 from ..game.position import cardinal_to_euclidean
 
 MAP_FILENAME = '4x4_melee_light2.xml'
-MAX_STEPS_PER_GAME = 1500
+MAX_STEPS_PER_GAME = {  # max_dim: max_steps
+    4: 1500,
+    8: 3000,
+    16: 4000,
+    32: 6000,
+    64: 8000,
+}
 REWARD_WIN = 1.0
 REWARD_DRAW = 0.0
 REWARD_LOSE = -1.0
@@ -27,7 +33,6 @@ class Game:
         # ------
         self.env_config = dict({
             'map_filename': MAP_FILENAME,
-            'max_steps_per_game': MAX_STEPS_PER_GAME,
             'reward_win': REWARD_WIN,
             'reward_draw': REWARD_DRAW,
             'reward_lose': REWARD_LOSE,
@@ -38,6 +43,8 @@ class Game:
         # episode state
         # -------------
         self.state = State(self.map_filename())
+        max_dim = max(self.height(), self.width())
+        self.env_config['max_steps_per_game'] = env_config.get('max_steps_per_game', MAX_STEPS_PER_GAME[max_dim])
         self.time = 0
         self.is_game_over = False
         self.winner = None

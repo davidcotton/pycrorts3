@@ -6,17 +6,16 @@ from ..game import Game
 from ..game.actions import ActionEncodings, NoopAction, MoveAction, AttackAction
 from ..game.position import cardinal_to_euclidean
 
-NUM_ACTIONS = 9
+num_actions = len(ActionEncodings)
 
 
 class PycroRts3MultiAgentEnv(MultiAgentEnv):
     def __init__(self, env_config=None) -> None:
         super().__init__()
         self.game = Game(env_config)
-
-        self.action_space = spaces.Discrete(NUM_ACTIONS)
+        self.action_space = spaces.Discrete(num_actions)
         self.observation_space = spaces.Dict({
-            'action_mask': spaces.Box(low=0, high=1, shape=(NUM_ACTIONS,), dtype=np.uint8),
+            'action_mask': spaces.Box(low=0, high=1, shape=(num_actions,), dtype=np.uint8),
             # 'board': spaces.Box(low=0, high=28, shape=(map_height, map_width), dtype=np.uint8),
             'board': spaces.Box(low=0, high=28, shape=(self.game.height() * self.game.width(),), dtype=np.uint8),
             # 'units': spaces.Dict({
@@ -37,19 +36,20 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         obs_dict = {}
         for unit_id, unit in self.game.units.items():
             player_id = unit.player_id
-            obs = {
+            agent_id = f'{player_id}.{unit_id}'
+            obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
                 'board': np.ravel(self.game.get_state(unit_id)),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.players[player_id].minerals]),
                 'time': np.array([self.game.time]),
             }
-            obs_dict[unit_id] = obs
         return obs_dict
 
     def step(self, action_dict):
         # convert action indexes into game action objects and queue them
-        for unit_id, action_id in action_dict.items():
+        for agent_id, action_id in action_dict.items():
+            player_id, unit_id = [int(x) for x in agent_id.split('.')]
             unit = self.game.get_unit(unit_id)
             if unit.has_pending_action:
                 continue
@@ -78,14 +78,14 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         rewards = {}
         for unit_id, unit in self.game.units.items():
             player_id = unit.player_id
-            obs = {
+            agent_id = f'{player_id}.{unit_id}'
+            obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
                 'board': np.ravel(self.game.get_state(unit_id)),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.players[player_id].minerals]),
                 'time': np.array([self.game.time]),
             }
-            obs_dict[unit_id] = obs
 
             if self.game.is_game_over:
                 if unit.player_id == self.game.winner:
@@ -94,9 +94,9 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
                     reward = self.game.reward_lose()
                 else:
                     reward = self.game.reward_draw()
-                rewards[unit_id] = reward
             else:
-                rewards[unit_id] = self.game.reward_step()
+                reward = self.game.reward_step()
+            rewards[agent_id] = reward
 
         game_over = {'__all__': self.game.is_game_over}
 
