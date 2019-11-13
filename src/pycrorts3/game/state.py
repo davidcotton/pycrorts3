@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 from typing import Dict, Optional
 
@@ -42,14 +43,27 @@ class State:
             self.units[unit_id] = unit_cls(unit_id, unit['player'], pos)
             self.unit_map[pos.y, pos.x] = UnitEncoding[unit_cls.__name__].value
 
+        self.initial_values = {
+            'players': deepcopy(self.players),
+            'terrain': deepcopy(self.terrain),
+            'units': deepcopy(self.units),
+            'unit_map': deepcopy(self.unit_map),
+        }
+
+    def reset(self) -> None:
+        self.players = deepcopy(self.initial_values['players'])
+        self.terrain = deepcopy(self.initial_values['terrain'])
+        self.units = deepcopy(self.initial_values['units'])
+        self.unit_map = deepcopy(self.initial_values['unit_map'])
+
     def move_unit(self, unit_id: int, new_position: Position) -> None:
         """Move a unit to a new position.
 
         :param unit_id: The ID of the unit to move.
         :param new_position: The new position to move to.
         """
-        assert unit_id in self.units
         unit = self.units[unit_id]
+        assert not unit.is_dead()
         old_x, old_y = unit.position
         new_x, new_y = new_position
         assert self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0
@@ -65,6 +79,7 @@ class State:
         :return: An optional target unit if dead, else None.
         """
         attacker = self.units[unit_id]
+        assert not attacker.is_dead()
         for target in self.units.values():
             if target.position == attack_position:
                 break
@@ -83,7 +98,7 @@ class State:
         """
         unit = self.units[unit_id]
         self.unit_map[unit.y, unit.x] = 0
-        unit.position = Position(-1, -1)  # move them off the board so other units can occupy their former location
+        unit.position = None  # move them off the board so other units can occupy their former location
 
     def is_legal_action(self, action: Action) -> bool:
         """Check an action is consistent with game rules/state?
@@ -136,20 +151,21 @@ class State:
         """
         state = self.terrain.copy() + self.unit_map.copy()
         if unit_id is not None:
-            assert unit_id in self.units
             unit = self.units[unit_id]
             if not unit.is_dead():
                 state[unit.y, unit.x] += len(UnitEncoding)
             for other in self.units.values():
-                if other.player_id == unit.player_id:
+                if other.is_dead():
+                    continue
+                elif other.player_id == unit.player_id:
                     state[other.y, other.x] += len(UnitEncoding)
         return state
 
     def _read_map_file(self, map_filename: str):
         """Read a XML microRTS map file.
 
-        :param map_filename: The name of the file, e.g. `4x4_melee_light2.xml`
+        :param map_filename: The name of the file, e.g. `4x4_melee_light2`
         :return: The map data.
         """
-        map_data = pkg_resources.resource_string(__name__, os.path.join('maps', map_filename)).decode('utf-8')
+        map_data = pkg_resources.resource_string(__name__, os.path.join('maps', map_filename + '.xml')).decode('utf-8')
         return untangle.parse(map_data)

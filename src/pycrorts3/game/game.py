@@ -57,7 +57,8 @@ class Game:
 
     def reset(self) -> None:
         """Reset the game."""
-        self.state = State(self.map_filename())
+        # self.state = State(self.map_filename())
+        self.state.reset()
         self.time = 0
         self.is_game_over = False
         self.winner = None
@@ -107,7 +108,7 @@ class Game:
             if len(indexes) > 1:
                 for i in indexes:
                     action = self.queued_actions[i]
-                    start_pos = self.state.units[action.unit_id].position
+                    start_pos = self.get_unit(action.unit_id).position
                     self.queued_actions[i] = NoopAction(action.unit_id, start_pos, action.start_time, action.end_time)
 
         # 2) move queued actions (this step) to pending (future steps)
@@ -147,19 +148,19 @@ class Game:
                                 break
                     self.state.remove_unit(dead_unit.id)
                     # check player has units
-                    num_units = sum(1 if u.player_id == dead_unit.player_id else 0 for u in self.state.units.values() if
+                    num_units = sum(1 if u.player_id == dead_unit.player_id else 0 for u in self.units.values() if
                                     not u.is_dead())
                     if num_units == 0:
                         self.is_game_over = True
                         self.winner = 1 - dead_unit.player_id
-                        print('GAME OVER, winner: %s' % self.winner)
+                        # print('GAME OVER, winner: %s' % self.winner)
                         return  # abort updating, game over
             self.get_unit(action.unit_id).has_pending_action = False
 
         # 4) end of episode check & clean up
         self.time += 1
         if self.time >= self.max_steps_per_game:
-            print('GAME OVER, draw')
+            # print('GAME OVER, draw')
             self.is_game_over = True
 
     def is_legal_action(self, action: Action) -> bool:
@@ -168,6 +169,10 @@ class Game:
         :param action: The action to check.
         :return: True if the action is valid, else False.
         """
+        unit = self.get_unit(action.unit_id)
+        if unit.is_dead() or unit.has_pending_action:
+            return False
+
         future_actions = list(itertools.chain(*self.pending_actions))
         future_actions += self.queued_actions
         for other in future_actions:
