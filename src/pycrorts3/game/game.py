@@ -1,14 +1,14 @@
 from collections import defaultdict, deque
 import itertools
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 
 from .actions import Action, NoopAction, MoveAction, AttackAction, ActionEncodings
-from .map import Map
 from .player import Player
-from ..game.position import cardinal_to_euclidean
+from .state import State
 from .units import Unit
+from ..game.position import cardinal_to_euclidean
 
 MAP_FILENAME = '4x4_melee_light2.xml'
 MAX_STEPS_PER_GAME = 1500
@@ -37,7 +37,7 @@ class Game:
 
         # episode state
         # -------------
-        self.map = Map(self.map_filename())
+        self.state = State(self.map_filename())
         self.time = 0
         self.is_game_over = False
         self.winner = None
@@ -50,7 +50,7 @@ class Game:
 
     def reset(self) -> None:
         """Reset the game."""
-        self.map = Map(self.map_filename())
+        self.state = State(self.map_filename())
         self.time = 0
         self.is_game_over = False
         self.winner = None
@@ -73,7 +73,7 @@ class Game:
         :param action: The action to add.
         """
         if not self.is_legal_action(action):
-            unit = self.map.get_unit(action.unit_id)
+            unit = self.get_unit(action.unit_id)
             action = NoopAction(action.unit_id, unit.position, action.start_time, action.end_time)
         self.queued_actions.append(action)
 
@@ -100,7 +100,7 @@ class Game:
             if len(indexes) > 1:
                 for i in indexes:
                     action = self.queued_actions[i]
-                    start_pos = self.map.units[action.unit_id].position
+                    start_pos = self.state.units[action.unit_id].position
                     self.queued_actions[i] = NoopAction(action.unit_id, start_pos, action.start_time, action.end_time)
 
         # 2) move queued actions (this step) to pending (future steps)
@@ -110,7 +110,7 @@ class Game:
             while len(self.pending_actions) <= relative_end_time:
                 self.pending_actions.append([])
             self.pending_actions[relative_end_time].append(action)
-            self.map.get_unit(action.unit_id).has_pending_action = True
+            self.get_unit(action.unit_id).has_pending_action = True
 
         # 3) execute actions that complete this step
         to_execute = self.pending_actions.popleft()
@@ -119,9 +119,9 @@ class Game:
             if isinstance(action, NoopAction):
                 pass
             elif isinstance(action, MoveAction):
-                self.map.move_unit(action.unit_id, action.position)
+                self.state.move_unit(action.unit_id, action.position)
             elif isinstance(action, AttackAction):
-                dead_unit = self.map.attack_unit(action.unit_id, action.position)
+                dead_unit = self.state.attack_unit(action.unit_id, action.position)
                 if dead_unit:
                     # copy microRTS logic
                     # if two units attack simultaneously, the first unit kills the 2nd, before 2nd strikes
@@ -138,20 +138,20 @@ class Game:
                             if pending_action.unit_id == dead_unit.id:
                                 to_execute.pop(i)
                                 break
-                    self.map.remove_unit(dead_unit.id)
+                    self.state.remove_unit(dead_unit.id)
                     # check player has units
-                    num_units = sum(1 if u.player_id == dead_unit.player_id else 0 for u in self.map.units.values() if
+                    num_units = sum(1 if u.player_id == dead_unit.player_id else 0 for u in self.state.units.values() if
                                     not u.is_dead())
                     if num_units == 0:
                         self.is_game_over = True
                         self.winner = 1 - dead_unit.player_id
                         print('GAME OVER, winner: %s' % self.winner)
                         return  # abort updating, game over
-            self.map.get_unit(action.unit_id).has_pending_action = False
+            self.get_unit(action.unit_id).has_pending_action = False
 
         # 4) end of episode check & clean up
         self.time += 1
-        if self.time >= self.max_steps_per_game():
+        if self.time >= self.max_steps_per_game:
             print('GAME OVER, draw')
             self.is_game_over = True
 
@@ -169,7 +169,7 @@ class Game:
             if isinstance(action, MoveAction):
                 if action.position == other.position:
                     return False  # square _might_ be occupied when the action executes (copying microRTS logic)
-        is_valid = self.map.is_legal_action(action)
+        is_valid = self.state.is_legal_action(action)
         return is_valid
 
     def get_action_mask(self, unit: Unit):
@@ -185,7 +185,7 @@ class Game:
 
         future_actions = list(itertools.chain(*self.pending_actions))
         future_actions += self.queued_actions
-        action_mask = self.map.get_action_mask(unit)
+        action_mask = self.state.get_action_mask(unit)
         # mask move actions set to be occupied by other pending actions
         for action_id in range(1, 5):
             if action_mask[action_id] == 0:
@@ -204,14 +204,29 @@ class Game:
         :param unit_id: The ID of the unit to fetch the state for.
         :return: A numpy array encoded to represent the state.
         """
-        return self.map.to_array(unit_id)
+        return self.state.to_array(unit_id)
 
+    @property
     def players(self) -> List[Player]:
-        return self.map.players
+        return self.state.players
+
+    @property
+    def units(self) -> Dict[int, Unit]:
+        return self.state.units
+
+    def get_unit(self, unit_id: int) -> Unit:
+        return self.state.get_unit(unit_id)
 
     def map_filename(self) -> str:
         return self.env_config['map_filename']
 
+    def height(self) -> int:
+        return self.state.height
+
+    def width(self) -> int:
+        return self.state.width
+
+    @property
     def max_steps_per_game(self) -> int:
         return self.env_config['max_steps_per_game']
 

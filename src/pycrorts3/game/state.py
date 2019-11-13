@@ -11,7 +11,7 @@ from .position import Position, cardinal_to_euclidean
 from .units import Unit, unit_classes, UnitEncoding
 
 
-class Map:
+class State:
     def __init__(self, map_filename: str) -> None:
         super().__init__()
         map_data = self._read_map_file(map_filename)
@@ -73,7 +73,7 @@ class Map:
             return None
         target.hitpoints -= attacker.deal_damage()
         if target.hitpoints <= 0:
-            # pass the dead unit back to the main class so it can clear up any references to it
+            # pass the dead unit back to the Game class so it can clear up any references to it
             return target
 
     def remove_unit(self, unit_id: int) -> None:
@@ -81,7 +81,6 @@ class Map:
 
         :param unit_id: The ID of the unit to remove.
         """
-        # unit = self.units.pop(unit_id)
         unit = self.units[unit_id]
         self.unit_map[unit.y, unit.x] = 0
         unit.position = Position(-1, -1)  # move them off the board so other units can occupy their former location
