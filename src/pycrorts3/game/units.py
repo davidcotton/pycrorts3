@@ -164,12 +164,12 @@ unit_type_table = {
 
 
 unit_classes = {
+    'Base': BaseBuilding,
+    'Barracks': BarracksBuilding,
     'Worker': WorkerUnit,
     'Light': LightUnit,
     'Heavy': HeavyUnit,
     'Ranged': RangedUnit,
-    'Base': BaseBuilding,
-    'Barracks': BarracksBuilding,
 }
 
 
