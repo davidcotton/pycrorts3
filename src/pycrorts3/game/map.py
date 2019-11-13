@@ -42,19 +42,17 @@ class Map:
             self.units[unit_id] = unit_cls(unit_id, unit['player'], pos)
             self.unit_map[pos.y, pos.x] = UnitEncoding[unit_cls.__name__].value
 
-    def get_unit(self, unit_id: int) -> Unit:
-        return self.units[unit_id]
-
     def move_unit(self, unit_id: int, new_position: Position) -> None:
-        if unit_id not in self.units:
-            raise ValueError
-        # assert unit_id in self.units
+        """Move a unit to a new position.
+
+        :param unit_id: The ID of the unit to move.
+        :param new_position: The new position to move to.
+        """
+        assert unit_id in self.units
         unit = self.units[unit_id]
         old_x, old_y = unit.position
         new_x, new_y = new_position
-        if not(self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0):
-            raise ValueError
-        # assert self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0
+        assert self.terrain[new_y, new_x] == 0 and self.unit_map[new_y, new_x] == 0
         self.unit_map[new_y, new_x], self.unit_map[old_y, old_x] = self.unit_map[old_y, old_x], 0
         unit.position = new_position
 
@@ -127,6 +125,9 @@ class Map:
             action = action_cls(unit.id, new_posn, 0, 0)
             mask[action_type.value] = int(self.is_legal_action(action))
         return np.array(mask, dtype=np.uint8)
+
+    def get_unit(self, unit_id: int) -> Unit:
+        return self.units[unit_id]
 
     def to_array(self, unit_id=None) -> np.ndarray:
         """Export a 2D representation of the game state.
