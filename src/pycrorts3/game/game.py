@@ -48,7 +48,8 @@ class Game:
         # ----------
         self.queued_actions: deque[Action] = deque()  # action queued to be
 
-    def reset(self):
+    def reset(self) -> None:
+        """Reset the game."""
         self.map = Map(self.map_filename())
         self.time = 0
         self.is_game_over = False
