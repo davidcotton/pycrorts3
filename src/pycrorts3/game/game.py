@@ -24,6 +24,7 @@ class Game:
         super().__init__()
 
         # config
+        # ------
         self.env_config = dict({
             'map_filename': MAP_FILENAME,
             'max_steps_per_game': MAX_STEPS_PER_GAME,
@@ -35,14 +36,17 @@ class Game:
         }, **env_config or {})
 
         # episode state
+        # -------------
         self.map = Map(self.map_filename())
         self.time = 0
         self.is_game_over = False
         self.winner = None
-        self.pending_actions: deque[Action] = deque()
+        # each list of actions in deque represents a game step, indexed from the current step
+        self.pending_actions: deque[List[Action]] = deque()
 
         # step state
-        self.queued_actions: deque[Action] = deque()
+        # ----------
+        self.queued_actions: deque[Action] = deque()  # action queued to be
 
     def reset(self):
         self.map = Map(self.map_filename())
@@ -52,57 +56,38 @@ class Game:
         self.pending_actions.clear()
         self.queued_actions.clear()
 
-    def step(self, action):
-        # validate action, if invalid replace with NOOP action with same duration
-        #  - check terrain & unit positions
-        #  - check pending actions
+    def step(self, action: Action) -> None:
+        """Request to make a game action.
+
+        Actions are validated against terrain, current unit positions and `pending` action positions.
+        New actions cannot occupy an occupied cell (irrespective of whether the cell could be empty when the action
+          executes).
+        If the new action is invalid, it will be replaced with a NOOP action of the same duration as the
+          original action.
+        This copies microRTS logic.
+
+        The original or the replacement NOOP action are then queued to be further processed at the end of the turn,
+          during the `update()` method.
+
+        :param action: The action to add.
+        """
         if not self.is_legal_action(action):
             unit = self.map.get_unit(action.unit_id)
             action = NoopAction(action.unit_id, unit.position, action.start_time, action.end_time)
-        # queue the action to be processed at the end of turn
         self.queued_actions.append(action)
 
-    def is_legal_action(self, action):
-        future_actions = list(itertools.chain(*self.pending_actions))
-        future_actions += self.queued_actions
-        for other in future_actions:
-            if action.unit_id == other.unit_id:
-                return False  # an action already in-progress for this unit
-            if isinstance(action, MoveAction):
-                if action.position == other.position:
-                    return False  # square _might_ be occupied when the action executes (copying microRTS logic)
-        is_valid = self.map.is_legal_action(action)
-        return is_valid
-
-    def get_action_mask(self, unit: Unit):
-        if unit.is_dead():
-            action_mask = np.zeros(shape=(len(ActionEncodings),), dtype=np.uint8)
-            action_mask[0] = 1
-            return action_mask
-
-        future_actions = list(itertools.chain(*self.pending_actions))
-        future_actions += self.queued_actions
-        for action in future_actions:
-            if action.unit_id == unit.id:
-                # target unit has an action in-progress, can't make any legal actions
-                action_mask = np.zeros(shape=(len(ActionEncodings),), dtype=np.uint8)
-                action_mask[0] = 1  # use NOOP until we add in-progress flag to action mask
-                break
-        else:
-            action_mask = self.map.get_action_mask(unit)
-            # mask move directions set to be occupied by other pending actions
-            for action_id in range(1, 5):
-                if action_mask[action_id] == 0:
-                    continue
-                action_type = ActionEncodings(action_id).name
-                position = cardinal_to_euclidean(unit.position, action_type)
-                for other in future_actions:
-                    if position == other.position:
-                        action_mask[action_id] = 0
-
-        return action_mask
-
     def update(self) -> None:
+        """Complete the current game time-step.
+
+        Actions queued this step are validated and added to the queue of pending actions to executed at a later time.
+
+        Invalid actions are replaced with NOOP actions of the same duration as the original action.
+        Actions are validated in the order they are received, i.e. 2 valid, queued actions with the same destination,
+          the first action will continue as normal, while the second will be replaced with a NOOP.
+        Similarly, if two units attack each other simultaneously, the first unit to attack will kill the second unit
+          before it has a chance to strike back.
+        This is copying microRTS logic.
+        """
         assert not self.is_game_over
         # 1) validate queued actions
         #  - count duplicates
@@ -124,7 +109,7 @@ class Game:
             while len(self.pending_actions) <= relative_end_time:
                 self.pending_actions.append([])
             self.pending_actions[relative_end_time].append(action)
-            self.map.get_unit(action.unit_id).in_progress = True
+            self.map.get_unit(action.unit_id).has_pending_action = True
 
         # 3) execute actions that complete this step
         to_execute = self.pending_actions.popleft()
@@ -161,7 +146,7 @@ class Game:
                         self.winner = 1 - dead_unit.player_id
                         print('GAME OVER, winner: %s' % self.winner)
                         return  # abort updating, game over
-            self.map.get_unit(action.unit_id).in_progress = False
+            self.map.get_unit(action.unit_id).has_pending_action = False
 
         # 4) end of episode check & clean up
         self.time += 1
@@ -169,7 +154,55 @@ class Game:
             print('GAME OVER, draw')
             self.is_game_over = True
 
-    def get_state(self, unit_id=None):
+    def is_legal_action(self, action: Action) -> bool:
+        """Determine if an action is consistent with in the current game state.
+
+        :param action: The action to check.
+        :return: True if the action is valid, else False.
+        """
+        future_actions = list(itertools.chain(*self.pending_actions))
+        future_actions += self.queued_actions
+        for other in future_actions:
+            if action.unit_id == other.unit_id:
+                return False  # an action already in-progress for this unit
+            if isinstance(action, MoveAction):
+                if action.position == other.position:
+                    return False  # square _might_ be occupied when the action executes (copying microRTS logic)
+        is_valid = self.map.is_legal_action(action)
+        return is_valid
+
+    def get_action_mask(self, unit: Unit):
+        """Get a mask of legal actions available to a unit.
+
+        :param unit: The unit to generate the action mask for.
+        :return: A numpy array where 1 is a legal action, else 0
+        """
+        if unit.has_pending_action or unit.is_dead():
+            action_mask = np.zeros(shape=(len(ActionEncodings),), dtype=np.uint8)
+            action_mask[0] = 1
+            return action_mask
+
+        future_actions = list(itertools.chain(*self.pending_actions))
+        future_actions += self.queued_actions
+        action_mask = self.map.get_action_mask(unit)
+        # mask move actions set to be occupied by other pending actions
+        for action_id in range(1, 5):
+            if action_mask[action_id] == 0:
+                continue
+            action_type = ActionEncodings(action_id).name
+            position = cardinal_to_euclidean(unit.position, action_type)
+            for other in future_actions:
+                if position == other.position:
+                    action_mask[action_id] = 0
+
+        return action_mask
+
+    def get_state(self, unit_id: int):
+        """Get a representation of the game state from a unit's perspective.
+
+        :param unit_id: The ID of the unit to fetch the state for.
+        :return: A numpy array encoded to represent the state.
+        """
         return self.map.to_array(unit_id)
 
     def players(self) -> List[Player]:
