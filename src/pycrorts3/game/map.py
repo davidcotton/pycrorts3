@@ -12,7 +12,7 @@ from .units import Unit, unit_classes, UnitEncoding
 
 
 class Map:
-    def __init__(self, map_filename) -> None:
+    def __init__(self, map_filename: str) -> None:
         super().__init__()
         map_data = self._read_map_file(map_filename)
 
@@ -42,10 +42,10 @@ class Map:
             self.units[unit_id] = unit_cls(unit_id, unit['player'], pos)
             self.unit_map[pos.y, pos.x] = UnitEncoding[unit_cls.__name__].value
 
-    def get_unit(self, unit_id):
+    def get_unit(self, unit_id: int) -> Unit:
         return self.units[unit_id]
 
-    def move_unit(self, unit_id, new_position):
+    def move_unit(self, unit_id: int, new_position: Position) -> None:
         if unit_id not in self.units:
             raise ValueError
         # assert unit_id in self.units
