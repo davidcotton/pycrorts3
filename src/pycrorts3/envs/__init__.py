@@ -1,3 +1,3 @@
 from .hierarchical_multi_agent_env import HierarchicalPycroRts3MultiAgentEnv
-from .multi_agent_env import PycroRts3MultiAgentEnv
+from .multi_agent_env import PycroRts3MultiAgentEnv, SquarePycroRts3MultiAgentEnv
 from .pycrorts3_env import PycroRts3Env

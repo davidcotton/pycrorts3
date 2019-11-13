@@ -13,10 +13,15 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
     def __init__(self, env_config=None) -> None:
         super().__init__()
         self.game = Game(env_config)
-        self.action_space = spaces.Discrete(num_actions)
-        self.observation_space = spaces.Dict({
+        self.action_space = self._act_space()
+        self.observation_space = self._obs_space()
+
+    def _act_space(self) -> spaces.Space:
+        return spaces.Discrete(num_actions)
+
+    def _obs_space(self) -> spaces.Space:
+        return spaces.Dict({
             'action_mask': spaces.Box(low=0, high=1, shape=(num_actions,), dtype=np.uint8),
-            # 'board': spaces.Box(low=0, high=28, shape=(map_height, map_width), dtype=np.uint8),
             'board': spaces.Box(low=0, high=28, shape=(self.game.height() * self.game.width(),), dtype=np.uint8),
             # 'units': spaces.Dict({
             #     # 'id': spaces.Box(low=0, high=65535, shape=(1,), dtype=np.uint16),
@@ -39,7 +44,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
             agent_id = f'{player_id}.{unit_id}'
             obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
-                'board': np.ravel(self.game.get_state(unit_id)),
+                'board': self._get_board(unit_id),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.players[player_id].minerals]),
                 'time': np.array([self.game.time]),
@@ -81,7 +86,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
             agent_id = f'{player_id}.{unit_id}'
             obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
-                'board': np.ravel(self.game.get_state(unit_id)),
+                'board': self._get_board(unit_id),
                 'player_id': np.array([player_id]),
                 'resources': np.array([self.game.players[player_id].minerals]),
                 'time': np.array([self.game.time]),
@@ -101,3 +106,20 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         game_over = {'__all__': self.game.is_game_over}
 
         return obs_dict, rewards, game_over, {}
+
+    def _get_board(self, unit_id: int) -> np.array:
+        return np.ravel(self.game.get_state(unit_id))
+
+
+class SquarePycroRts3MultiAgentEnv(PycroRts3MultiAgentEnv):
+    def _obs_space(self) -> spaces.Space:
+        return spaces.Dict({
+            'action_mask': spaces.Box(low=0, high=1, shape=(num_actions,), dtype=np.uint8),
+            'board': spaces.Box(low=0, high=28, shape=(self.game.height(), self.game.width()), dtype=np.uint8),
+            'player_id': spaces.Box(low=0, high=1, shape=(1,), dtype=np.uint8),
+            'resources': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(1,), dtype=np.uint16),
+            'time': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(1,), dtype=np.uint16),
+        })
+
+    def _get_board(self, unit_id: int) -> np.array:
+        return self.game.get_state(unit_id)
