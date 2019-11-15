@@ -15,13 +15,14 @@ class Unit:
     harvest_time = 0
     return_time = 0
     sight_radius = 0
+    produces = []
 
     def __init__(self,
                  unit_id: int,
                  player_id: int,
                  position: Position,
-                 # hitpoints: int,
-                 # resources: int,
+                 hitpoints: int,
+                 resources=0,
                  # cost: int,
                  # min_damage: int,
                  # max_damage: int,
@@ -37,8 +38,8 @@ class Unit:
         self.id = int(unit_id)
         self.player_id = int(player_id)
         self.position: Position = position
-        # self.hitpoints = int(hitpoints)
-        # self.resources = int(resources)
+        self.hitpoints = int(hitpoints)
+        self.resources = int(resources)
         # self.cost = int(cost)
         # self.min_damage = int(min_damage)
         # self.max_damage = int(max_damage)
@@ -69,7 +70,24 @@ class Unit:
         return self.hitpoints <= 0
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}<{self.position.x},{self.position.y}>'
+        if self.position:
+            return f'{self.__class__.__name__}<{self.position.x},{self.position.y}>'
+        else:
+            return f'{self.__class__.__name__}<None>'
+
+
+class Resource(Unit):
+    cost = 0
+    hitpoints = 1
+    min_damage = 0
+    max_damage = 0
+    attack_range = 0
+    produce_time = 0
+    move_time = 0
+    attack_time = 0
+    harvest_time = 0
+    return_time = 0
+    sight_radius = 0
 
 
 class WorkerUnit(Unit):
@@ -132,6 +150,7 @@ class BaseBuilding(Unit):
     move_time = 0
     attack_time = 0
     sight_radius = 5
+    produces = [WorkerUnit]
 
 
 class BarracksBuilding(Unit):
@@ -144,6 +163,7 @@ class BarracksBuilding(Unit):
     move_time = 0
     attack_time = 0
     sight_radius = 3
+    produces = [LightUnit, HeavyUnit, RangedUnit]
 
 
 unit_type_table = {
@@ -164,6 +184,7 @@ unit_type_table = {
 
 
 unit_classes = {
+    'Resource': Resource,
     'Base': BaseBuilding,
     'Barracks': BarracksBuilding,
     'Worker': WorkerUnit,
@@ -172,5 +193,6 @@ unit_classes = {
     'Ranged': RangedUnit,
 }
 
-
-UnitEncoding = Enum('UnitEncoding', 'BaseBuilding BarracksBuilding WorkerUnit LightUnit HeavyUnit RangedUnit')
+UnitEncoding = Enum('UnitEncoding',
+                    ['Resource', 'BaseBuilding', 'BarracksBuilding', 'WorkerUnit', 'LightUnit', 'HeavyUnit',
+                     'RangedUnit'])

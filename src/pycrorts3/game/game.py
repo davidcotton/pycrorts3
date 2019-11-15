@@ -4,7 +4,8 @@ from typing import Dict, List
 
 import numpy as np
 
-from .actions import Action, NoopAction, MoveAction, AttackAction, ActionEncodings
+from .actions import Action, ActionEncodings, NoopAction, MoveAction, AttackAction, HarvestAction, ReturnAction, \
+    ProduceAction
 from .player import Player
 from .state import State
 from .units import Unit
@@ -102,7 +103,8 @@ class Game:
         #  - count duplicates
         positions = defaultdict(list)
         for i, action in enumerate(self.queued_actions):
-            positions[action.position].append(i)
+            if isinstance(action, MoveAction):
+                positions[action.position].append(i)
         #  - replace all duplicates with NOOP
         for pos, indexes in positions.items():
             if len(indexes) > 1:
@@ -115,6 +117,7 @@ class Game:
         while len(self.queued_actions):
             action = self.queued_actions.popleft()
             relative_end_time = action.end_time - self.time  # relative from now
+            assert relative_end_time >= 0
             while len(self.pending_actions) <= relative_end_time:
                 self.pending_actions.append([])
             self.pending_actions[relative_end_time].append(action)
@@ -146,7 +149,7 @@ class Game:
                             if pending_action.unit_id == dead_unit.id:
                                 to_execute.pop(i)
                                 break
-                    self.state.remove_unit(dead_unit.id)
+                    self.state.remove_unit(dead_unit)
                     # check player has units
                     num_units = sum(1 if u.player_id == dead_unit.player_id else 0 for u in self.units.values() if
                                     not u.is_dead())
@@ -155,6 +158,12 @@ class Game:
                         self.winner = 1 - dead_unit.player_id
                         # print('GAME OVER, winner: %s' % self.winner)
                         return  # abort updating, game over
+            elif isinstance(action, HarvestAction):
+                self.state.harvest(action.unit_id, action.position)
+            elif isinstance(action, ReturnAction):
+                self.state.return_minerals(action.unit_id, action.position)
+            elif isinstance(action, ProduceAction):
+                raise ValueError
             self.get_unit(action.unit_id).has_pending_action = False
 
         # 4) end of episode check & clean up

@@ -3,8 +3,10 @@ import numpy as np
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from ..game import Game
-from ..game.actions import ActionEncodings, NoopAction, MoveAction, AttackAction
+from ..game.actions import ActionEncodings, NoopAction, MoveAction, AttackAction, HarvestAction, ReturnAction, \
+    ProduceAction
 from ..game.position import cardinal_to_euclidean
+from ..game.units import Resource
 
 num_actions = len(ActionEncodings)
 
@@ -40,39 +42,59 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         self.game.reset()
         obs_dict = {}
         for unit_id, unit in self.game.units.items():
-            player_id = unit.player_id
-            agent_id = f'{player_id}.{unit_id}'
+            if isinstance(unit, Resource):
+                continue  # don't build observations for minerals
+            agent_id = f'{unit.player_id}.{unit_id}'
             obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
                 'board': self._get_board(unit_id),
-                'player_id': np.array([player_id]),
-                'resources': np.array([self.game.players[player_id].minerals]),
+                'player_id': np.array([unit.player_id]),
+                'resources': np.array([self.game.players[unit.player_id].minerals]),
                 'time': np.array([self.game.time]),
             }
         return obs_dict
 
     def step(self, action_dict):
-        # convert action indexes into game action objects and queue them
+        # convert action indexes into game action objects and enqueue
         for agent_id, action_id in action_dict.items():
             player_id, unit_id = [int(x) for x in agent_id.split('.')]
             unit = self.game.get_unit(unit_id)
+            if isinstance(unit, Resource):
+                continue  # minerals can't have actions
             if unit.has_pending_action:
-                continue
+                continue  # units must finish an action before starting a new one
+
             action_type = ActionEncodings(action_id).name
             start_time = self.game.time
             if action_type == 'NOOP':
                 end_time = self.game.time
                 action = NoopAction(unit_id, unit.position, start_time, end_time)
-            elif action_type.startswith('MOVE'):
-                pos = cardinal_to_euclidean(unit.position, action_type)
-                end_time = self.game.time + unit.move_time - 1
-                action = MoveAction(unit_id, pos, start_time, end_time)
-            elif action_type.startswith('ATTACK'):
-                pos = cardinal_to_euclidean(unit.position, action_type)
-                end_time = self.game.time + unit.attack_time - 1
-                action = AttackAction(unit_id, pos, start_time, end_time)
             else:
-                raise ValueError('Invalid action')
+                position = cardinal_to_euclidean(unit.position, action_type)
+                if action_type.startswith('MOVE'):
+                    end_time = self.game.time + unit.move_time - 1
+                    action = MoveAction(unit_id, position, start_time, end_time)
+                elif action_type.startswith('ATTACK'):
+                    end_time = self.game.time + unit.attack_time - 1
+                    # for target in self.game.units.values():
+                    #     if target.position == position:
+                    #         break
+                    # else:
+                    #     raise ValueError
+                    # action = AttackAction(unit_id, position, start_time, end_time, target.id)
+                    action = AttackAction(unit_id, position, start_time, end_time)
+                elif action_type.startswith('HARVEST'):
+                    end_time = self.game.time + unit.harvest_time - 1
+                    action = HarvestAction(unit_id, position, start_time, end_time)
+                elif action_type.startswith('RETURN'):
+                    end_time = self.game.time + unit.return_time - 1
+                    action = ReturnAction(unit_id, position, start_time, end_time)
+                # elif action_type.startswith('PRODUCE'):
+                #     end_time = self.game.time + unit.produce_time - 1
+                #     produce_type = LightUnit
+                #     action = ProduceAction(unit_id, position, start_time, end_time, produce_type)
+                else:
+                    raise ValueError('Invalid action')
             self.game.step(action)
 
         # update the game with actions begun & completed this step
@@ -82,13 +104,14 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         obs_dict = {}
         rewards = {}
         for unit_id, unit in self.game.units.items():
-            player_id = unit.player_id
-            agent_id = f'{player_id}.{unit_id}'
+            if isinstance(unit, Resource):
+                continue  # don't build observations for minerals
+            agent_id = f'{unit.player_id}.{unit_id}'
             obs_dict[agent_id] = {
                 'action_mask': self.game.get_action_mask(unit),
                 'board': self._get_board(unit_id),
-                'player_id': np.array([player_id]),
-                'resources': np.array([self.game.players[player_id].minerals]),
+                'player_id': np.array([unit.player_id]),
+                'resources': np.array([self.game.players[unit.player_id].minerals]),
                 'time': np.array([self.game.time]),
             }
 

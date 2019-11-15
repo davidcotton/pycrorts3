@@ -6,10 +6,13 @@ import numpy as np
 import pkg_resources
 import untangle
 
-from .actions import ActionEncodings, Action, NoopAction, MoveAction, AttackAction, action_encoding_classes
+from .actions import ActionEncodings, action_encoding_classes, Action, NoopAction, MoveAction, AttackAction, \
+    HarvestAction, ReturnAction, ProduceAction
 from .player import Player
 from .position import Position, cardinal_to_euclidean
-from .units import Unit, unit_classes, UnitEncoding
+from .units import Unit, unit_classes, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit
+
+HARVEST_AMOUNT = 1
 
 
 class State:
@@ -39,9 +42,11 @@ class State:
         for unit in map_data.rts_PhysicalGameState.units.rts_units_Unit:
             unit_id = int(unit['ID'])
             unit_cls = unit_classes[unit['type']]
-            pos = Position(int(unit['x']), int(unit['y']))
-            self.units[unit_id] = unit_cls(unit_id, unit['player'], pos)
-            self.unit_map[pos.y, pos.x] = UnitEncoding[unit_cls.__name__].value
+            position = Position(int(unit['x']), int(unit['y']))
+            hitpoints = int(unit['hitpoints'])
+            resources = int(unit['resources'])
+            self.units[unit_id] = unit_cls(unit_id, unit['player'], position, hitpoints, resources)
+            self.unit_map[position.y, position.x] = UnitEncoding[unit_cls.__name__].value
 
         self.initial_values = {
             'players': deepcopy(self.players),
@@ -72,7 +77,10 @@ class State:
 
     def attack_unit(self, unit_id: int, attack_position: Position) -> Optional[Unit]:
         """Execute an attack action.
+
         If the target moves or dies before the action executes, the attack does not occur.
+        If the target unit was killed, pass it back to the Game class so it can clear up any references to it
+          before removing.
 
         :param unit_id: The ID of the attacking unit.
         :param attack_position: The cell to attack.
@@ -84,21 +92,66 @@ class State:
             if target.position == attack_position:
                 break
         else:
-            # target may have move or died before attack action executed
-            return None
+            return None  # target may have move or died before attack action executed
+        assert not isinstance(target, Resource)
         target.hitpoints -= attacker.deal_damage()
         if target.hitpoints <= 0:
-            # pass the dead unit back to the Game class so it can clear up any references to it
             return target
 
-    def remove_unit(self, unit_id: int) -> None:
-        """Remove a unit from the game (after it has died).
+    def remove_unit(self, unit: Unit) -> None:
+        """Remove a unit from the game (e.g. after it has died or been mined out).
 
-        :param unit_id: The ID of the unit to remove.
+        We leave dead units in `self.units` to get around RLlib.MultiAgent not liking agents obs disappearing.
+        However we set their location to None so other units can occupy their former location
+
+        :param unit: The unit to remove.
         """
-        unit = self.units[unit_id]
         self.unit_map[unit.y, unit.x] = 0
-        unit.position = None  # move them off the board so other units can occupy their former location
+        unit.position = None
+
+    def harvest(self, unit_id: int, harvest_position: Position) -> None:
+        """A worker unit harvests minerals from an adjacent mineral patch.
+
+        :param unit_id: The ID of the worker unit harvesting.
+        :param harvest_position: The position to harvest.
+        """
+        harvester = self.units[unit_id]
+        assert not harvester.is_dead()
+        for unit in self.units.values():
+            if isinstance(unit, Resource) and unit.position == harvest_position:
+                minerals = unit
+                break
+        else:
+            return
+
+        harvest_amount = HARVEST_AMOUNT if minerals.resources > HARVEST_AMOUNT else minerals.resources
+        assert harvest_amount > 0
+        harvester.resources += harvest_amount
+        minerals.resources -= harvest_amount
+        assert minerals.resources >= 0
+        if minerals.resources == 0:
+            self.remove_unit(minerals)
+
+    def return_minerals(self, unit_id: int, base_position: Position) -> None:
+        """A worker unit can return harvested minerals to an adjacent BaseBuilding.
+
+        :param unit_id: The ID of the worker unit returning harvested minerals.
+        :param base_position: The position of the BaseBuilding receiving the minerals.
+        """
+        harvester = self.units[unit_id]
+        assert not harvester.is_dead()
+        assert harvester.resources
+        for base in self.units.values():
+            if isinstance(base, BaseBuilding) \
+                    and base.player_id == harvester.player_id \
+                    and base.position == base_position:
+                break
+        else:
+            return
+        assert self._manhattan_distance(harvester.position, base.position) == 1
+        player = self.players[harvester.player_id]
+        player.minerals += harvester.resources
+        harvester.resources = 0
 
     def is_legal_action(self, action: Action) -> bool:
         """Check an action is consistent with game rules/state?
@@ -107,22 +160,62 @@ class State:
         :return: True if the action is legal, else False.
         """
         if isinstance(action, NoopAction):
-            return True  # just assume all NOOPs are valid for now
+            return True  # nothing to check
         x, y = action.position
         if not(0 <= x < self.width and 0 <= y < self.height):
-            is_valid = False  # must be within map bounds
+            return False  # must be within map bounds
         elif isinstance(action, MoveAction):  # ensure cell isn't occupied
-            is_valid = self.terrain[y, x] == 0 and self.unit_map[y, x] == 0
+            unit = self.units[action.unit_id]
+            if isinstance(unit, (Resource, BaseBuilding, BarracksBuilding)):
+                return False
+            if self._manhattan_distance(unit.position, action.position) != 1:
+                return False  # must be adjacent
+            return self.terrain[y, x] == 0 and self.unit_map[y, x] == 0
         elif isinstance(action, AttackAction):  # ensure target cell IS occupied by an ENEMY unit
             attacker = self.units[action.unit_id]
-            is_valid = False
-            for unit in self.units.values():
-                if unit.position == action.position:  # can't attack empty cell
-                    is_valid = attacker.player_id != unit.player_id  # only attack enemy
+            if isinstance(attacker, (Resource, BaseBuilding, BarracksBuilding)):
+                return False
+            if self._manhattan_distance(attacker.position, action.position) > attacker.attack_range:
+                return False  # must be within attack range
+            for target in self.units.values():
+                if target.position == action.position:  # can't attack empty cell
+                    return attacker.player_id == (1 - target.player_id)  # only attack enemy
+            else:
+                return False
+        elif isinstance(action, HarvestAction):
+            harvester = self.units[action.unit_id]
+            if not isinstance(harvester, WorkerUnit):
+                return False  # only workers can harvest minerals
+            if harvester.resources:
+                return False  # workers can only carry one load at one time
+            if self._manhattan_distance(harvester.position, action.position) != 1:
+                return False  # worker must be adjacent to minerals to mine
+            for minerals in self.units.values():
+                if isinstance(minerals, Resource) and minerals.position == action.position:
+                    return True
+            else:
+                return False
+        elif isinstance(action, ReturnAction):
+            harvester = self.units[action.unit_id]
+            if not isinstance(harvester, WorkerUnit):
+                return False  # only workers can harvest/return minerals
+            if harvester.resources <= 0:
+                return False  # worker must have minerals to return
+            for base in self.units.values():
+                if isinstance(base, BaseBuilding) \
+                        and base.position == action.position\
+                        and base.player_id == harvester.player_id:
                     break
+            else:
+                return False  # action position must be a base on the harvester's team
+            if self._manhattan_distance(harvester.position, action.position) == 1:
+                return True  # worker must be adjacent to base to return
+            else:
+                return False
+        elif isinstance(action, ProduceAction):
+            raise ValueError('Not implemented')
         else:
             raise ValueError('Invalid action')
-        return is_valid
 
     def get_action_mask(self, unit: Unit) -> np.array:
         """Generate a bit mask for all actions.
@@ -169,3 +262,7 @@ class State:
         """
         map_data = pkg_resources.resource_string(__name__, os.path.join('maps', map_filename + '.xml')).decode('utf-8')
         return untangle.parse(map_data)
+
+    @staticmethod
+    def _manhattan_distance(start: Position, goal: Position) -> int:
+        return abs(goal.x - start.x) + abs(goal.y - start.y)
