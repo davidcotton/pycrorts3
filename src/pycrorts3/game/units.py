@@ -18,11 +18,11 @@ class Unit:
     produces = []
 
     def __init__(self,
-                 unit_id: int,
-                 player_id: int,
+                 unit_id,
+                 player_id,
                  position: Position,
-                 hitpoints: int,
                  resources=0,
+                 hitpoints=None,
                  # cost: int,
                  # min_damage: int,
                  # max_damage: int,
@@ -38,8 +38,9 @@ class Unit:
         self.id = int(unit_id)
         self.player_id = int(player_id)
         self.position: Position = position
-        self.hitpoints = int(hitpoints)
         self.resources = int(resources)
+        if hitpoints is not None:
+            self.hitpoints = int(hitpoints)
         # self.cost = int(cost)
         # self.min_damage = int(min_damage)
         # self.max_damage = int(max_damage)
@@ -75,6 +76,12 @@ class Unit:
         else:
             return f'{self.__class__.__name__}<None>'
 
+    @staticmethod
+    def from_xml(xml):
+        unit_cls = unit_classes[xml['type']]
+        position = Position(int(xml['x']), int(xml['y']))
+        return unit_cls(xml['ID'], xml['player'], position, xml['hitpoints'], xml['resources'])
+
 
 class Resource(Unit):
     cost = 0
@@ -102,6 +109,7 @@ class WorkerUnit(Unit):
     harvest_time = 20
     return_time = 10
     sight_radius = 3
+    # produces = [BaseBuilding, BarracksBuilding]
 
 
 class LightUnit(Unit):

@@ -10,7 +10,7 @@ from .actions import ActionEncodings, action_encoding_classes, Action, NoopActio
     HarvestAction, ReturnAction, ProduceAction
 from .player import Player
 from .position import Position, cardinal_to_euclidean
-from .units import Unit, unit_classes, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit
+from .units import Unit, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit
 
 HARVEST_AMOUNT = 1
 
@@ -21,14 +21,13 @@ class State:
         map_data = self._read_map_file(map_filename)
 
         # players
-        self.players = [Player(p['ID'], p['resources']) for p in map_data.rts_PhysicalGameState.players.rts_Player]
+        self.players = [Player.from_xml(p) for p in map_data.rts_PhysicalGameState.players.rts_Player]
 
         # terrain
         self.height = int(map_data.rts_PhysicalGameState['height'])
         self.width = int(map_data.rts_PhysicalGameState['width'])
         terrain_str = map_data.rts_PhysicalGameState.terrain.cdata
-        assert self.height * self.width == len(terrain_str), \
-            'Invalid map dimensions: height * width should equal terrain'
+        assert self.height * self.width == len(terrain_str), 'Invalid map dimensions: height * width != len(terrain)'
         self.terrain = np.zeros((self.height, self.width), dtype=np.uint8)
         i = 0
         for y in range(self.height):
@@ -39,14 +38,10 @@ class State:
         # units
         self.units: Dict[int, Unit] = {}
         self.unit_map = np.zeros((self.height, self.width), dtype=np.uint8)
-        for unit in map_data.rts_PhysicalGameState.units.rts_units_Unit:
-            unit_id = int(unit['ID'])
-            unit_cls = unit_classes[unit['type']]
-            position = Position(int(unit['x']), int(unit['y']))
-            hitpoints = int(unit['hitpoints'])
-            resources = int(unit['resources'])
-            self.units[unit_id] = unit_cls(unit_id, unit['player'], position, hitpoints, resources)
-            self.unit_map[position.y, position.x] = UnitEncoding[unit_cls.__name__].value
+        for unit_xml in map_data.rts_PhysicalGameState.units.rts_units_Unit:
+            unit = Unit.from_xml(unit_xml)
+            self.units[unit.id] = unit
+            self.unit_map[unit.y, unit.x] = UnitEncoding[unit.__class__.__name__].value
 
         self.initial_values = {
             'players': deepcopy(self.players),

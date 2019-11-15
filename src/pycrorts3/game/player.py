@@ -8,3 +8,7 @@ class Player:
 
     def __repr__(self) -> str:
         return f'Player<id:{self.id}, minerals:{self.minerals}>'
+
+    @staticmethod
+    def from_xml(xml):
+        return Player(xml['ID'], xml['resources'])
