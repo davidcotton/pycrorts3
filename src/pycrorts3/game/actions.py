@@ -15,7 +15,7 @@ ActionEncodings = Enum(
      'ATTACK_UP', 'ATTACK_RIGHT', 'ATTACK_DOWN', 'ATTACK_LEFT',
      'HARVEST_UP', 'HARVEST_RIGHT', 'HARVEST_DOWN', 'HARVEST_LEFT',
      'RETURN_UP', 'RETURN_RIGHT', 'RETURN_DOWN', 'RETURN_LEFT',
-     # 'PRODUCE_UP', 'PRODUCE_RIGHT', 'PRODUCE_DOWN', 'PRODUCE_LEFT'
+     'PRODUCE_UP', 'PRODUCE_RIGHT', 'PRODUCE_DOWN', 'PRODUCE_LEFT'
      ],
     start=0
 )
@@ -86,8 +86,8 @@ action_encoding_classes = {
     ActionEncodings.RETURN_RIGHT: ReturnAction,
     ActionEncodings.RETURN_DOWN: ReturnAction,
     ActionEncodings.RETURN_LEFT: ReturnAction,
-    # ActionEncodings.PRODUCE_UP: ProduceAction,
-    # ActionEncodings.PRODUCE_RIGHT: ProduceAction,
-    # ActionEncodings.PRODUCE_DOWN: ProduceAction,
-    # ActionEncodings.PRODUCE_LEFT: ProduceAction,
+    ActionEncodings.PRODUCE_UP: ProduceAction,
+    ActionEncodings.PRODUCE_RIGHT: ProduceAction,
+    ActionEncodings.PRODUCE_DOWN: ProduceAction,
+    ActionEncodings.PRODUCE_LEFT: ProduceAction,
 }

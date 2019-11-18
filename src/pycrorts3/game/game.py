@@ -3,6 +3,7 @@ import itertools
 from typing import Dict, List
 
 import numpy as np
+from pprint import pprint
 
 from .actions import Action, ActionEncodings, NoopAction, MoveAction, AttackAction, HarvestAction, ReturnAction, \
     ProduceAction
@@ -157,19 +158,23 @@ class Game:
                         self.is_game_over = True
                         self.winner = 1 - dead_unit.player_id
                         # print('GAME OVER, winner: %s' % self.winner)
+                        # pprint(self.players)
+                        # pprint(self.units)
                         return  # abort updating, game over
             elif isinstance(action, HarvestAction):
                 self.state.harvest(action.unit_id, action.position)
             elif isinstance(action, ReturnAction):
                 self.state.return_minerals(action.unit_id, action.position)
             elif isinstance(action, ProduceAction):
-                raise ValueError
+                self.state.produce(action.unit_id, action.position, action.produce_type)
             self.get_unit(action.unit_id).has_pending_action = False
 
         # 4) end of episode check & clean up
         self.time += 1
         if self.time >= self.max_steps_per_game:
             # print('GAME OVER, draw')
+            # pprint(self.players)
+            # pprint(self.units)
             self.is_game_over = True
 
     def is_legal_action(self, action: Action) -> bool:

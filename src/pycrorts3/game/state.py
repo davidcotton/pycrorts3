@@ -1,6 +1,6 @@
 from copy import deepcopy
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Type
 
 import numpy as np
 import pkg_resources
@@ -10,7 +10,7 @@ from .actions import ActionEncodings, action_encoding_classes, Action, NoopActio
     HarvestAction, ReturnAction, ProduceAction
 from .player import Player
 from .position import Position, cardinal_to_euclidean
-from .units import Unit, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit
+from .units import Unit, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit, LightUnit
 
 HARVEST_AMOUNT = 1
 
@@ -148,6 +148,21 @@ class State:
         player.minerals += harvester.resources
         harvester.resources = 0
 
+    def produce(self, unit_id: int, produce_position: Position, produce_type: Type[Unit]) -> None:
+        producer = self.units[unit_id]
+        assert not producer.is_dead()
+        player = self.players[producer.player_id]
+        x, y = produce_position
+        if self.terrain[y, x] != 0 or self.unit_map[y, x] != 0:
+            return
+        if player.minerals < produce_type.cost:
+            return
+        player.minerals -= produce_type.cost
+        unit_ids = sorted(self.units.keys())
+        new_unit_id = unit_ids[-1] + 1
+        new_unit = produce_type(new_unit_id, producer.player_id, produce_position)
+        self.units[new_unit.id] = new_unit
+
     def is_legal_action(self, action: Action) -> bool:
         """Check an action is consistent with game rules/state?
 
@@ -183,8 +198,8 @@ class State:
                 return False  # only workers can harvest minerals
             if harvester.resources:
                 return False  # workers can only carry one load at one time
-            if self._manhattan_distance(harvester.position, action.position) != 1:
-                return False  # worker must be adjacent to minerals to mine
+            # if self._manhattan_distance(harvester.position, action.position) != 1:
+            #     return False  # worker must be adjacent to minerals to mine
             for minerals in self.units.values():
                 if isinstance(minerals, Resource) and minerals.position == action.position:
                     return True
@@ -203,12 +218,22 @@ class State:
                     break
             else:
                 return False  # action position must be a base on the harvester's team
-            if self._manhattan_distance(harvester.position, action.position) == 1:
-                return True  # worker must be adjacent to base to return
-            else:
-                return False
+            # if self._manhattan_distance(harvester.position, action.position) != 1:
+            #     return False  # worker must be adjacent to base to return
+            return True
         elif isinstance(action, ProduceAction):
-            raise ValueError('Not implemented')
+            producer = self.units[action.unit_id]
+            if not producer.produces:
+                return False  # has nothing to produce
+            player = self.players[producer.player_id]
+            producing = action.produce_type
+            if producing.cost > player.minerals:
+                return False  # can't afford
+            if self.terrain[y, x] != 0 or self.unit_map[y, x] != 0:
+                return False  # new unit location must be vacant
+            # if self._manhattan_distance(producer.position, action.position) != 1:
+            #     return False  # new unit must be adjacent to producer
+            return True
         else:
             raise ValueError('Invalid action')
 
@@ -224,7 +249,11 @@ class State:
                 continue  # assume always valid
             action_cls = action_encoding_classes[action_type]
             new_posn = cardinal_to_euclidean(unit.position, action_type.name)
-            action = action_cls(unit.id, new_posn, 0, 0)
+            if action_cls == ProduceAction:
+                # action = action_cls(unit.id, new_posn, 0, 0, LightUnit)
+                action = action_cls(unit.id, new_posn, 0, 0, WorkerUnit)
+            else:
+                action = action_cls(unit.id, new_posn, 0, 0)
             mask[action_type.value] = int(self.is_legal_action(action))
         return np.array(mask, dtype=np.uint8)
 
