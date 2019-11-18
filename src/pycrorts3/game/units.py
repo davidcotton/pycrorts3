@@ -21,8 +21,8 @@ class Unit:
                  unit_id,
                  player_id,
                  position: Position,
-                 resources=0,
                  hitpoints=None,
+                 resources=0,
                  # cost: int,
                  # min_damage: int,
                  # max_damage: int,
@@ -38,9 +38,9 @@ class Unit:
         self.id = int(unit_id)
         self.player_id = int(player_id)
         self.position: Position = position
-        self.resources = int(resources)
         if hitpoints is not None:
             self.hitpoints = int(hitpoints)
+        self.resources = int(resources)
         # self.cost = int(cost)
         # self.min_damage = int(min_damage)
         # self.max_damage = int(max_damage)
@@ -71,16 +71,18 @@ class Unit:
         return self.hitpoints <= 0
 
     def __repr__(self) -> str:
-        if self.position:
-            return f'{self.__class__.__name__}<{self.position.x},{self.position.y}>'
-        else:
-            return f'{self.__class__.__name__}<None>'
+        string = self.__class__.__name__
+        string += f'<{self.position.x},{self.position.y}>' if self.position else '<None>'
+        string += f'(p:{self.player_id}, hp:{self.hitpoints})'
+        return string
 
     @staticmethod
     def from_xml(xml):
         unit_cls = unit_classes[xml['type']]
         position = Position(int(xml['x']), int(xml['y']))
-        return unit_cls(xml['ID'], xml['player'], position, xml['hitpoints'], xml['resources'])
+        hitpoints = xml['hitpoints']
+        resources = xml['resources']
+        return unit_cls(xml['ID'], xml['player'], position, hitpoints, resources)
 
 
 class Resource(Unit):
