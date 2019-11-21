@@ -15,7 +15,6 @@ class Unit:
     harvest_time = 0
     return_time = 0
     sight_radius = 0
-    produces = []
 
     def __init__(self,
                  unit_id,
@@ -55,11 +54,11 @@ class Unit:
 
     @property
     def x(self) -> int:
-        return self.position.x
+        return self.position.x if self.position else None
 
     @property
     def y(self) -> int:
-        return self.position.y
+        return self.position.y if self.position else None
 
     def deal_damage(self, deterministic=True) -> int:
         if deterministic:
@@ -70,10 +69,19 @@ class Unit:
     def is_dead(self) -> bool:
         return self.hitpoints <= 0
 
+    def can_make_action(self) -> bool:
+        """Can this unit make an action?
+
+        Units can only make actions if they are alive and have no actions in progress.
+
+        :return: True if the unit can make an action, else False.
+        """
+        return not(self.has_pending_action or self.is_dead())
+
     def __repr__(self) -> str:
         string = self.__class__.__name__
         string += f'<{self.position.x},{self.position.y}>' if self.position else '<None>'
-        string += f'(p:{self.player_id}, hp:{self.hitpoints})'
+        string += f'(pid:{self.player_id}, hp:{self.hitpoints})'
         return string
 
     @staticmethod
@@ -98,6 +106,12 @@ class Resource(Unit):
     return_time = 0
     sight_radius = 0
 
+    def __repr__(self) -> str:
+        string = self.__class__.__name__
+        string += f'<{self.position.x},{self.position.y}>' if self.position else '<None>'
+        string += f'(minerals:{self.resources})'
+        return string
+
 
 class WorkerUnit(Unit):
     cost = 1
@@ -111,7 +125,6 @@ class WorkerUnit(Unit):
     harvest_time = 20
     return_time = 10
     sight_radius = 3
-    # produces = [BaseBuilding, BarracksBuilding]
 
 
 class LightUnit(Unit):
@@ -160,7 +173,6 @@ class BaseBuilding(Unit):
     move_time = 0
     attack_time = 0
     sight_radius = 5
-    produces = [WorkerUnit]
 
 
 class BarracksBuilding(Unit):
@@ -173,7 +185,6 @@ class BarracksBuilding(Unit):
     move_time = 0
     attack_time = 0
     sight_radius = 3
-    produces = [LightUnit, HeavyUnit, RangedUnit]
 
 
 unit_type_table = {
@@ -192,6 +203,12 @@ unit_type_table = {
     'single-move': {},
 }
 
+unit_produces = {
+    WorkerUnit: [BarracksBuilding, BaseBuilding],
+    BaseBuilding: [WorkerUnit],
+    BarracksBuilding: [LightUnit, HeavyUnit, RangedUnit]
+}
+
 
 unit_classes = {
     'Resource': Resource,
@@ -204,5 +221,5 @@ unit_classes = {
 }
 
 UnitEncoding = Enum('UnitEncoding',
-                    ['Resource', 'BaseBuilding', 'BarracksBuilding', 'WorkerUnit', 'LightUnit', 'HeavyUnit',
-                     'RangedUnit'])
+                    # ['Resource', 'BaseBuilding', 'BarracksBuilding', 'WorkerUnit', 'LightUnit', 'HeavyUnit', 'RangedUnit'], start=2)
+                    ['BaseBuilding', 'BarracksBuilding', 'WorkerUnit', 'LightUnit', 'HeavyUnit', 'RangedUnit'], start=3)

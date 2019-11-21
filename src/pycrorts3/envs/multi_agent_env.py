@@ -6,7 +6,7 @@ from ..game import Game
 from ..game.actions import ActionEncodings, NoopAction, MoveAction, AttackAction, HarvestAction, ReturnAction, \
     ProduceAction
 from ..game.position import cardinal_to_euclidean
-from ..game.units import Resource, WorkerUnit, LightUnit
+from ..game.units import Resource, unit_produces
 
 num_actions = len(ActionEncodings)
 
@@ -42,6 +42,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
     def _obs_space(self) -> spaces.Space:
         return spaces.Dict({
             'action_mask': spaces.Box(low=0, high=1, shape=(num_actions,), dtype=np.uint8),
+            # 'avail_actions': spaces.Box(-10, 10, shape=(num_actions, 2)),
             'board': spaces.Box(low=0, high=28, shape=(self.game.height() * self.game.width(),), dtype=np.uint8),
             # 'player_id': spaces.Box(low=0, high=1, shape=(1,), dtype=np.uint8),
             # 'unit_id': spaces.Box(low=0, high=np.iinfo('uint16').max, shape=(1,), dtype=np.uint16),
@@ -71,11 +72,6 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for agent_id, action_id in action_dict.items():
             player_id, unit_id = [int(x) for x in agent_id.split('.')]
             unit = self.game.get_unit(unit_id)
-            if isinstance(unit, Resource):
-                continue  # minerals can't have actions
-            if unit.has_pending_action:
-                continue  # units must finish an action before starting a new one
-
             action_type = ActionEncodings(action_id).name
             start_time = self.game.time
             if action_type == 'NOOP':
@@ -102,8 +98,8 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
                     end_time = self.game.time + unit.return_time - 1
                     action = ReturnAction(unit_id, position, start_time, end_time)
                 elif action_type.startswith('PRODUCE'):
-                    # produce_type = LightUnit
-                    produce_type = WorkerUnit
+                    produces = unit_produces[unit.__class__]
+                    produce_type = produces[0]
                     end_time = self.game.time + produce_type.produce_time - 1
                     action = ProduceAction(unit_id, position, start_time, end_time, produce_type)
                 else:
@@ -119,7 +115,7 @@ class PycroRts3MultiAgentEnv(MultiAgentEnv):
         for unit in self.game.units.values():
             if isinstance(unit, Resource):
                 continue  # don't build observations for minerals
-            if unit.has_pending_action and not self.game.is_game_over:
+            if not unit.can_make_action() and not self.game.is_game_over:
                 # units must finish an action before starting a new one
                 # unless the game is over, in which case we must send RLlib terminal obs+rewards or else it gets angry
                 continue

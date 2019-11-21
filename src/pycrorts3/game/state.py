@@ -1,4 +1,5 @@
 from copy import deepcopy
+from math import sqrt
 import os
 from typing import Dict, Optional, Type
 
@@ -10,7 +11,7 @@ from .actions import ActionEncodings, action_encoding_classes, Action, NoopActio
     HarvestAction, ReturnAction, ProduceAction
 from .player import Player
 from .position import Position, cardinal_to_euclidean
-from .units import Unit, UnitEncoding, Resource, BaseBuilding, BarracksBuilding, WorkerUnit, LightUnit
+from .units import Unit, UnitEncoding, unit_produces, Resource, BaseBuilding, BarracksBuilding, WorkerUnit
 
 HARVEST_AMOUNT = 1
 
@@ -40,8 +41,7 @@ class State:
         self.unit_map = np.zeros((self.height, self.width), dtype=np.uint8)
         for unit_xml in map_data.rts_PhysicalGameState.units.rts_units_Unit:
             unit = Unit.from_xml(unit_xml)
-            self.units[unit.id] = unit
-            self.unit_map[unit.y, unit.x] = UnitEncoding[unit.__class__.__name__].value
+            self.add_unit(unit)
 
         self.initial_values = {
             'players': deepcopy(self.players),
@@ -93,6 +93,12 @@ class State:
         if target.hitpoints <= 0:
             return target
 
+    def add_unit(self, unit: Unit) -> None:
+        self.units[unit.id] = unit
+        # self.unit_map[unit.y, unit.x] = UnitEncoding[unit.__class__.__name__].value
+        value = 2 if isinstance(unit, Resource) else UnitEncoding[unit.__class__.__name__].value
+        self.unit_map[unit.y, unit.x] = value
+
     def remove_unit(self, unit: Unit) -> None:
         """Remove a unit from the game (e.g. after it has died or been mined out).
 
@@ -118,7 +124,6 @@ class State:
                 break
         else:
             return
-
         harvest_amount = HARVEST_AMOUNT if minerals.resources > HARVEST_AMOUNT else minerals.resources
         assert harvest_amount > 0
         harvester.resources += harvest_amount
@@ -161,7 +166,7 @@ class State:
         unit_ids = sorted(self.units.keys())
         new_unit_id = unit_ids[-1] + 1
         new_unit = produce_type(new_unit_id, producer.player_id, produce_position)
-        self.units[new_unit.id] = new_unit
+        self.add_unit(new_unit)
 
     def is_legal_action(self, action: Action) -> bool:
         """Check an action is consistent with game rules/state?
@@ -185,7 +190,7 @@ class State:
             attacker = self.units[action.unit_id]
             if isinstance(attacker, (Resource, BaseBuilding, BarracksBuilding)):
                 return False
-            if self._manhattan_distance(attacker.position, action.position) > attacker.attack_range:
+            if self._euclidean_distance(attacker.position, action.position) > attacker.attack_range:
                 return False  # must be within attack range
             for target in self.units.values():
                 if target.position == action.position:  # can't attack empty cell
@@ -198,8 +203,6 @@ class State:
                 return False  # only workers can harvest minerals
             if harvester.resources:
                 return False  # workers can only carry one load at one time
-            # if self._manhattan_distance(harvester.position, action.position) != 1:
-            #     return False  # worker must be adjacent to minerals to mine
             for minerals in self.units.values():
                 if isinstance(minerals, Resource) and minerals.position == action.position:
                     return True
@@ -218,21 +221,20 @@ class State:
                     break
             else:
                 return False  # action position must be a base on the harvester's team
-            # if self._manhattan_distance(harvester.position, action.position) != 1:
-            #     return False  # worker must be adjacent to base to return
             return True
         elif isinstance(action, ProduceAction):
             producer = self.units[action.unit_id]
-            if not producer.produces:
-                return False  # has nothing to produce
+            # if not producer.produces:
+            if producer.__class__ not in unit_produces:
+                return False  # unit doesn't produce anything (quick check to invalidate most unit types)
+            if action.produce_type not in unit_produces[producer.__class__]:
+                return False  # producer doesn't produce that unit type
             player = self.players[producer.player_id]
             producing = action.produce_type
             if producing.cost > player.minerals:
                 return False  # can't afford
             if self.terrain[y, x] != 0 or self.unit_map[y, x] != 0:
                 return False  # new unit location must be vacant
-            # if self._manhattan_distance(producer.position, action.position) != 1:
-            #     return False  # new unit must be adjacent to producer
             return True
         else:
             raise ValueError('Invalid action')
@@ -250,8 +252,12 @@ class State:
             action_cls = action_encoding_classes[action_type]
             new_posn = cardinal_to_euclidean(unit.position, action_type.name)
             if action_cls == ProduceAction:
-                # action = action_cls(unit.id, new_posn, 0, 0, LightUnit)
-                action = action_cls(unit.id, new_posn, 0, 0, WorkerUnit)
+                produces = unit_produces[unit.__class__]
+                if not produces:
+                    mask[action_type.value] = 0
+                    continue
+                produce_type = produces[0]
+                action = action_cls(unit.id, new_posn, 0, 0, produce_type)
             else:
                 action = action_cls(unit.id, new_posn, 0, 0)
             mask[action_type.value] = int(self.is_legal_action(action))
@@ -260,25 +266,40 @@ class State:
     def get_unit(self, unit_id: int) -> Unit:
         return self.units[unit_id]
 
-    def to_array(self, unit_id=None) -> np.ndarray:
+    def to_array(self, unit_id) -> np.ndarray:
         """Export a 2D representation of the game state.
 
-        :param unit_id: Optionally present the state from the view of a unit.
-        :return: A 2D numpy array.
+        :param unit_id: The ID of the unit from which the state is presented.
+        :return: A 2D numpy array of shape (map_height, map_width).
         """
         state = self.terrain.copy() + self.unit_map.copy()
-        if unit_id is not None:
-            unit = self.units[unit_id]
-            if not unit.is_dead():
-                state[unit.y, unit.x] += len(UnitEncoding)
-            for other in self.units.values():
-                if other.is_dead():
-                    continue
-                elif other.player_id == unit.player_id:
-                    state[other.y, other.x] += len(UnitEncoding)
+        unit = self.units[unit_id]
+        if not unit.is_dead():
+            state[unit.y, unit.x] += len(UnitEncoding)
+        for other in self.units.values():
+            if other.is_dead():
+                continue
+            elif other.player_id == unit.player_id:
+                state[other.y, other.x] += len(UnitEncoding)
+            # if state.max() > 28:
+            #     raise ValueError
         return state
 
-    def _read_map_file(self, map_filename: str):
+    def to_array_global(self) -> np.ndarray:
+        """Export a 2D representation of the game state.
+
+        :return: A 2D numpy array of shape (map_height, map_width).
+        """
+        state = self.terrain.copy() + self.unit_map.copy()
+        for other in self.units.values():
+            if other.is_dead():
+                continue
+            elif other.player_id == 1:
+                state[other.y, other.x] += len(UnitEncoding)
+        return state
+
+    @staticmethod
+    def _read_map_file(map_filename: str):
         """Read a XML microRTS map file.
 
         :param map_filename: The name of the file, e.g. `4x4_melee_light2`
@@ -290,3 +311,7 @@ class State:
     @staticmethod
     def _manhattan_distance(start: Position, goal: Position) -> int:
         return abs(goal.x - start.x) + abs(goal.y - start.y)
+
+    @staticmethod
+    def _euclidean_distance(start: Position, goal: Position) -> float:
+        return sqrt((goal.x - start.x) ** 2 + (goal.y + start.y) ** 2)

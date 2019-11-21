@@ -9,7 +9,7 @@ from .actions import Action, ActionEncodings, NoopAction, MoveAction, AttackActi
     ProduceAction
 from .player import Player
 from .state import State
-from .units import Unit
+from .units import Unit, Resource
 from ..game.position import cardinal_to_euclidean
 
 MAP_FILENAME = '4x4_melee_light2.xml'
@@ -157,9 +157,7 @@ class Game:
                     if num_units == 0:
                         self.is_game_over = True
                         self.winner = 1 - dead_unit.player_id
-                        # print('GAME OVER, winner: %s' % self.winner)
-                        # pprint(self.players)
-                        # pprint(self.units)
+                        self._print_game_state()
                         return  # abort updating, game over
             elif isinstance(action, HarvestAction):
                 self.state.harvest(action.unit_id, action.position)
@@ -172,10 +170,30 @@ class Game:
         # 4) end of episode check & clean up
         self.time += 1
         if self.time >= self.max_steps_per_game:
-            # print('GAME OVER, draw')
-            # pprint(self.players)
-            # pprint(self.units)
             self.is_game_over = True
+            self._print_game_state()
+
+    def _print_game_state(self):
+        if self.winner is not None:
+            print('GAME OVER, winner: %s' % self.winner)
+        else:
+            print('GAME OVER, draw')
+        pprint(self.players)
+        # remaining_units = {k: v for k, v in self.units.items() if not v.is_dead()}
+        # pprint(remaining_units)
+        print(self.state.to_array_global())
+        units_killed = [0, 0]
+        units_remaining = [0, 0]
+        for unit in self.units.values():
+            if isinstance(unit, Resource):
+                continue
+            if unit.is_dead():
+                units_killed[unit.player_id] += 1
+            else:
+                units_remaining[unit.player_id] += 1
+        print('units_killed', units_killed)
+        print('units_remaining', units_remaining)
+        print()
 
     def is_legal_action(self, action: Action) -> bool:
         """Determine if an action is consistent with in the current game state.
@@ -184,7 +202,7 @@ class Game:
         :return: True if the action is valid, else False.
         """
         unit = self.get_unit(action.unit_id)
-        if unit.is_dead() or unit.has_pending_action:
+        if not unit.can_make_action():
             return False
 
         future_actions = list(itertools.chain(*self.pending_actions))
@@ -198,16 +216,15 @@ class Game:
         is_valid = self.state.is_legal_action(action)
         return is_valid
 
-    def get_action_mask(self, unit: Unit):
+    def get_action_mask(self, unit: Unit) -> np.array:
         """Get a mask of legal actions available to a unit.
 
         :param unit: The unit to generate the action mask for.
         :return: A numpy array where 1 is a legal action, else 0
         """
-        if unit.has_pending_action or unit.is_dead():
-            action_mask = np.zeros(shape=(len(ActionEncodings),), dtype=np.uint8)
-            action_mask[0] = 1
-            return action_mask
+        if not unit.can_make_action():
+            assert self.is_game_over  # this should only ever be reached on terminal obs
+            return np.zeros(shape=(len(ActionEncodings),), dtype=np.uint8)
 
         future_actions = list(itertools.chain(*self.pending_actions))
         future_actions += self.queued_actions
