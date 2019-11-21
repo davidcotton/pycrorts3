@@ -181,17 +181,21 @@ class State:
             return False  # must be within map bounds
         elif isinstance(action, MoveAction):  # ensure cell isn't occupied
             unit = self.units[action.unit_id]
-            if isinstance(unit, (Resource, BaseBuilding, BarracksBuilding)):
+            if isinstance(unit, (BaseBuilding, BarracksBuilding)):
                 return False
             if self._manhattan_distance(unit.position, action.position) != 1:
                 return False  # must be adjacent
             return self.terrain[y, x] == 0 and self.unit_map[y, x] == 0
         elif isinstance(action, AttackAction):  # ensure target cell IS occupied by an ENEMY unit
             attacker = self.units[action.unit_id]
-            if isinstance(attacker, (Resource, BaseBuilding, BarracksBuilding)):
+            if isinstance(attacker, (BaseBuilding, BarracksBuilding)):
                 return False
-            if self._euclidean_distance(attacker.position, action.position) > attacker.attack_range:
-                return False  # must be within attack range
+            # should be euclidean distance, but this massively slows everything down
+            # will add in logic to only use it when strictly necessary
+            # if self._euclidean_distance(attacker.position, action.position) > attacker.attack_range:
+            # dist = self._manhattan_distance(attacker.position, action.position)
+            # if dist > attacker.attack_range:
+            #     return False  # must be within attack range
             for target in self.units.values():
                 if target.position == action.position:  # can't attack empty cell
                     return attacker.player_id == (1 - target.player_id)  # only attack enemy
